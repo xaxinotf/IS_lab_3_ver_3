@@ -1,6 +1,6 @@
-id,name,groupID,numLectures,numPracticals,requiresSubgroups,weekType
-MI-41,Статистичне моделювання,MI-41,3,1,No,Both
-MI-42,Розробка ПЗ під мобільні,MI-42,3,2,Yes,Odd
-TK-41,Інтелектуальні системи,TK-41,2,2,Yes,Even
-TTP-41,Теорія прийняття рішень,TTP-41,4,2,Yes,Both
-TTP-42,Статистичне моделювання,TTP-42,3,1,No,Both
+id;name;groupID;numLectures;numPracticals;requiresSubgroups;weekType
+S1;Теорія прийняття рішень;TTP-41;2;1;yes;both
+S2;Розробка ПЗ під мобільні;MI-41;3;2;yes;both
+S3;Інтелектуальні системи;TK-41;2;2;no;both
+S4;Теорія прийняття рішень;TTP-42;2;2;yes;both
+S5;Статистичне моделювання;MI-42;1;2;no;both
