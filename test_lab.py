@@ -2,7 +2,6 @@ import csv
 import random
 import copy
 from tabulate import tabulate
-import datetime
 
 # Структури даних
 class Auditorium:
@@ -23,8 +22,6 @@ class Lecturer:
         self.subjects_can_teach = [s.strip() for s in subjects_can_teach.split(';')] if subjects_can_teach else []
         self.types_can_teach = [t.strip() for t in types_can_teach.split(';')] if types_can_teach else []
         self.max_hours_per_week = int(max_hours_per_week)
-        self.assigned_hours_even = 0  # Навантаження на парний тиждень
-        self.assigned_hours_odd = 0   # Навантаження на непарний тиждень
 
 class Subject:
     def __init__(self, subject_id, name, group_id, num_lectures, num_practicals, requires_subgroups, week_type):
@@ -148,19 +145,21 @@ class Schedule:
         penalty = 0
         # Мінімізація прогалин у розкладі для груп (м'яке обмеження)
         for group in groups:
-            schedule_list = []
-            for time_slot, lessons in timetable.items():
-                for lesson in lessons:
-                    if lesson.group.number == group.number:
-                        schedule_list.append(time_slot)
-            schedule_sorted = sorted(schedule_list, key=lambda x: (DAYS.index(x[0]), int(x[1])))
-            for i in range(len(schedule_sorted) - 1):
-                day1, period1 = schedule_sorted[i]
-                day2, period2 = schedule_sorted[i + 1]
-                if day1 == day2:
-                    gaps = int(period2) - int(period1) - 1
-                    if gaps > 0:
-                        penalty += gaps
+            subgroups = group.subgroups if group.subgroups else [None]
+            for subgroup in subgroups:
+                schedule_list = []
+                for time_slot, lessons in timetable.items():
+                    for lesson in lessons:
+                        if lesson.group.number == group.number and lesson.subgroup == subgroup:
+                            schedule_list.append(time_slot)
+                schedule_sorted = sorted(schedule_list, key=lambda x: (DAYS.index(x[0]), int(x[1])))
+                for i in range(len(schedule_sorted) - 1):
+                    day1, period1 = schedule_sorted[i]
+                    day2, period2 = schedule_sorted[i + 1]
+                    if day1 == day2:
+                        gaps = int(period2) - int(period1) - 1
+                        if gaps > 0:
+                            penalty += gaps
         # Мінімізація прогалин у розкладі для викладачів (м'яке обмеження)
         for lecturer in lecturers:
             schedule_list = []
@@ -187,22 +186,31 @@ class Schedule:
         penalty = 0
         # Додавання штрафів за недотримання або перевищення кількості годин по предметах (м'яке обмеження)
         for subject in subjects:
-            scheduled_lectures = 0
-            scheduled_practicals = 0
-            for timetable in [self.even_timetable, self.odd_timetable]:
-                for time_slot, lessons in timetable.items():
-                    for lesson in lessons:
-                        if lesson.subject.id == subject.id:
-                            if lesson.type == 'Лекція':
-                                scheduled_lectures += 1
-                            elif lesson.type == 'Практика':
-                                scheduled_practicals += 1
-            # Обчислення різниці між запланованими та необхідними годинами
-            diff_lectures = scheduled_lectures - subject.num_lectures
-            diff_practicals = scheduled_practicals - subject.num_practicals
-            # Додавання штрафу за кожну недодану або перевищену годину (пропорційно різниці)
-            penalty += abs(diff_lectures) * 2  # Штраф помножений на 2 для більшої ваги
-            penalty += abs(diff_practicals) * 2
+            group = next((g for g in groups if g.number == subject.group_id), None)
+            if not group:
+                continue
+            subgroups = group.subgroups if group.subgroups else [None]
+            for subgroup in subgroups:
+                scheduled_lectures = 0
+                scheduled_practicals = 0
+                required_lectures = subject.num_lectures // len(subgroups) if subject.requires_subgroups else subject.num_lectures
+                required_practicals = subject.num_practicals // len(subgroups) if subject.requires_subgroups else subject.num_practicals
+                for timetable in [self.even_timetable, self.odd_timetable]:
+                    for time_slot, lessons in timetable.items():
+                        for lesson in lessons:
+                            if (lesson.subject.id == subject.id and
+                                lesson.group.number == group.number and
+                                lesson.subgroup == subgroup):
+                                if lesson.type == 'Лекція':
+                                    scheduled_lectures += 1
+                                elif lesson.type == 'Практика':
+                                    scheduled_practicals += 1
+                # Обчислення різниці між запланованими та необхідними годинами для підгрупи
+                diff_lectures = scheduled_lectures - required_lectures
+                diff_practicals = scheduled_practicals - required_practicals
+                # Додавання штрафу за кожну недодану або перевищену годину (пропорційно різниці)
+                penalty += abs(diff_lectures) * 2  # Штраф помножений на 2 для більшої ваги
+                penalty += abs(diff_practicals) * 2
         return penalty
 
 def get_possible_lecturers(lesson):
@@ -219,23 +227,15 @@ def is_conflict(lesson, time_slot, timetable):
         # Перевірка викладача (жорстке обмеження)
         if lesson.lecturer and existing_lesson.lecturer and existing_lesson.lecturer.id == lesson.lecturer.id:
             return True
-        # Перевірка групи (жорстке обмеження)
-        if existing_lesson.group.number == lesson.group.number:
-            # Якщо підгрупи, перевіряємо підгрупу
-            if lesson.subgroup and existing_lesson.subgroup:
-                if existing_lesson.subgroup == lesson.subgroup:
-                    return True
-            else:
-                return True
         # Перевірка аудиторії (жорстке обмеження)
         if lesson.auditorium and existing_lesson.auditorium and existing_lesson.auditorium.id == lesson.auditorium.id:
-            # Виняток для лекцій з одним викладачем
-            if not (
-                lesson.type == 'Лекція' and
-                existing_lesson.type == 'Лекція' and
-                lesson.lecturer and existing_lesson.lecturer and
-                lesson.lecturer.id == existing_lesson.lecturer.id
-            ):
+            return True
+        # Перевірка групи та підгрупи (жорстке обмеження)
+        if lesson.group.number == existing_lesson.group.number:
+            if lesson.subgroup == existing_lesson.subgroup:
+                return True
+            # Якщо одне з занять без підгрупи, конфліктує з усіма підгрупами
+            if not lesson.subgroup or not existing_lesson.subgroup:
                 return True
     return False
 
@@ -276,8 +276,9 @@ def create_initial_population():
             # Практичні
             pract_total = subject.num_practicals
             if subject.requires_subgroups and group.subgroups:
+                num_practicals_per_subgroup = pract_total // len(group.subgroups)
                 for subgroup in group.subgroups:
-                    for _ in range(pract_total // len(group.subgroups)):
+                    for _ in range(num_practicals_per_subgroup):
                         lesson = Lesson(subject, 'Практика', group, subgroup)
                         possible_lecturers = get_possible_lecturers(lesson)
                         if not possible_lecturers:
@@ -292,6 +293,7 @@ def create_initial_population():
                             continue
                         auditorium = random.choice(suitable_auditoriums)
                         lesson.auditorium = auditorium
+                        # Призначення рандомного часового слоту без порушення жорстких обмежень
                         assigned = assign_randomly(lesson, schedule)
                         if not assigned:
                             print(f"Failed to assign practical for {lesson.subject.name} to subgroup {subgroup} of group {group.number}.")
@@ -329,9 +331,9 @@ def assign_randomly(lesson, schedule):
                 timetable[time_slot].append(copy.deepcopy(lesson))
                 assigned = True
                 break
-        if not assigned:
-            return False
-    return True
+        if assigned:
+            break
+    return assigned
 
 def selection(population):
     # Вибираємо найкращі розклади на основі фітнесу (елітізм)
@@ -365,6 +367,12 @@ def mutate(schedule):
     # Випадкова зміна декількох занять у розкладі
     mutation_rate = 0.1  # Ймовірність мутації 10%
     for timetable in [schedule.even_timetable, schedule.odd_timetable]:
+        # Шанс додати нове заняття
+        if random.random() < mutation_rate:
+            add_random_lesson(timetable)
+        # Шанс видалити існуюче заняття
+        if random.random() < mutation_rate:
+            remove_random_lesson(timetable)
         for time_slot in TIME_SLOTS:
             if timetable[time_slot]:
                 for lesson in timetable[time_slot][:]:
@@ -379,6 +387,74 @@ def mutate(schedule):
                             timetable[new_time_slot].append(lesson)
     # Розрахунок фітнесу після мутації
     schedule.calculate_fitness()
+
+def add_random_lesson(timetable):
+    # Випадковий предмет
+    subject = random.choice(subjects)
+    group = next((g for g in groups if g.number == subject.group_id), None)
+    if not group:
+        return
+    # Випадковий тип заняття
+    lesson_type = random.choice(['Лекція', 'Практика'])
+    lessons_to_add = []
+    if lesson_type == 'Практика' and subject.requires_subgroups and group.subgroups:
+        for subgroup in group.subgroups:
+            lesson = Lesson(subject, lesson_type, group, subgroup)
+            lessons_to_add.append(lesson)
+    else:
+        lesson = Lesson(subject, lesson_type, group)
+        lessons_to_add.append(lesson)
+    # Призначаємо викладача та аудиторію
+    for lesson in lessons_to_add:
+        possible_lecturers = get_possible_lecturers(lesson)
+        if not possible_lecturers:
+            return
+        lecturer = random.choice(possible_lecturers)
+        lesson.lecturer = lecturer
+        if lesson.subgroup:
+            students = group.size // len(group.subgroups)
+            suitable_auditoriums = [aud for aud in auditoriums if aud.capacity >= students]
+        else:
+            students = group.size
+            suitable_auditoriums = [aud for aud in auditoriums if aud.capacity >= students]
+        if not suitable_auditoriums:
+            return
+        auditorium = random.choice(suitable_auditoriums)
+        lesson.auditorium = auditorium
+    # Призначаємо часовий слот
+    available_time_slots = TIME_SLOTS.copy()
+    random.shuffle(available_time_slots)
+    for time_slot in available_time_slots:
+        conflict = False
+        for lesson in lessons_to_add:
+            if is_conflict(lesson, time_slot, timetable):
+                conflict = True
+                break
+        if not conflict:
+            for lesson in lessons_to_add:
+                lesson.time_slot = time_slot
+                timetable[time_slot].append(copy.deepcopy(lesson))
+            break
+
+def remove_random_lesson(timetable):
+    # Випадкове заняття для видалення
+    all_lessons = [lesson for lessons in timetable.values() for lesson in lessons]
+    if not all_lessons:
+        return
+    lesson_to_remove = random.choice(all_lessons)
+    # Якщо це заняття з підгрупами, видаляємо всі пов'язані
+    lessons_to_remove = []
+    if lesson_to_remove.subgroup:
+        for lessons in timetable.values():
+            for lesson in lessons:
+                if (lesson.subject.id == lesson_to_remove.subject.id and
+                    lesson.group.number == lesson_to_remove.group.number and
+                    lesson.type == lesson_to_remove.type):
+                    lessons_to_remove.append(lesson)
+    else:
+        lessons_to_remove.append(lesson_to_remove)
+    for lesson in lessons_to_remove:
+        timetable[lesson.time_slot].remove(lesson)
 
 def genetic_algorithm():
     population = create_initial_population()
