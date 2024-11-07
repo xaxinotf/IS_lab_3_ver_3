@@ -1,174 +1,190 @@
 
 
 ### **ДИВІТЬСЯ КОД TEST_LAB.py**
-Рішення ДО ВАШОГО ПЕРШОГО ПУНКТУ 1:
 
-Окремий облік занять для кожної підгрупи:
+---
 
-Я модифікував метод _calculate_soft_constraints класу Schedule, щоб він обчислював кількість запланованих занять окремо для кожної підгрупи.
+**Рішення: Вимога 1**
 
-python
-Копировать код
-def _calculate_soft_constraints(self):
-    penalty = 0
-    for subject in subjects:
-        group = next((g for g in groups if g.number == subject.group_id), None)
-        if not group:
-            continue
-        subgroups = group.subgroups if group.subgroups else [None]
-        for subgroup in subgroups:
-            scheduled_lectures = 0
-            scheduled_practicals = 0
-            required_lectures = subject.num_lectures // len(subgroups) if subject.requires_subgroups else subject.num_lectures
-            required_practicals = subject.num_practicals // len(subgroups) if subject.requires_subgroups else subject.num_practicals
-            for timetable in [self.even_timetable, self.odd_timetable]:
-                for time_slot, lessons in timetable.items():
-                    for lesson in lessons:
-                        if (lesson.subject.id == subject.id and
-                            lesson.group.number == group.number and
-                            lesson.subgroup == subgroup):
-                            if lesson.type == 'Лекція':
-                                scheduled_lectures += 1
-                            elif lesson.type == 'Практика':
-                                scheduled_practicals += 1
-            diff_lectures = scheduled_lectures - required_lectures
-            diff_practicals = scheduled_practicals - required_practicals
-            penalty += abs(diff_lectures) * 2
-            penalty += abs(diff_practicals) * 2
-    return penalty
-Пояснення:
+1. **Окремий облік занять для кожної підгрупи:**
 
-Облік підгруп: Для кожного предмета і групи я отримую список підгруп. Якщо підгруп немає, використовую [None], щоб обробити групи без підгруп.
-Розрахунок запланованих занять: Для кожної підгрупи окремо обчислюю кількість запланованих лекцій та практичних занять, перебираючи всі уроки в розкладі.
-Розрахунок необхідних занять: Обчислюю необхідну кількість занять для кожної підгрупи, ділячи загальну кількість занять на кількість підгруп (для предметів, які вимагають підгруп).
-Обчислення штрафів: Розраховую різницю між запланованими та необхідними заняттями для кожної підгрупи. Штраф додається пропорційно до абсолютного значення цієї різниці.
-Результат: Таким чином, фітнес-функція враховує дисбаланс у кількості занять між підгрупами, і ідеальний скор можливий лише тоді, коли всі підгрупи мають необхідну кількість занять.
-Перевірка під час створення розкладу:
+   Я модифікував метод `_calculate_soft_constraints` класу `Schedule`, щоб він обчислював кількість запланованих занять окремо для кожної підгрупи.
 
-У функції create_initial_population під час створення початкового розкладу я переконався, що заняття призначаються для кожної підгрупи окремо.
+   ```python
+   def _calculate_soft_constraints(self):
+       penalty = 0
+       for subject in subjects:
+           group = next((g for g in groups if g.number == subject.group_id), None)
+           if not group:
+               continue
+           subgroups = group.subgroups if group.subgroups else [None]
+           for subgroup in subgroups:
+               scheduled_lectures = 0
+               scheduled_practicals = 0
+               required_lectures = subject.num_lectures // len(subgroups) if subject.requires_subgroups else subject.num_lectures
+               required_practicals = subject.num_practicals // len(subgroups) if subject.requires_subgroups else subject.num_practicals
+               for timetable in [self.even_timetable, self.odd_timetable]:
+                   for time_slot, lessons in timetable.items():
+                       for lesson in lessons:
+                           if (lesson.subject.id == subject.id and
+                               lesson.group.number == group.number and
+                               lesson.subgroup == subgroup):
+                               if lesson.type == 'Лекція':
+                                   scheduled_lectures += 1
+                               elif lesson.type == 'Практика':
+                                   scheduled_practicals += 1
+               diff_lectures = scheduled_lectures - required_lectures
+               diff_practicals = scheduled_practicals - required_practicals
+               penalty += abs(diff_lectures) * 2
+               penalty += abs(diff_practicals) * 2
+       return penalty
+   ```
 
-python
-Копировать код
-# Практичні
-pract_total = subject.num_practicals
-if subject.requires_subgroups and group.subgroups:
-    num_practicals_per_subgroup = pract_total // len(group.subgroups)
-    for subgroup in group.subgroups:
-        for _ in range(num_practicals_per_subgroup):
-            lesson = Lesson(subject, 'Практика', group, subgroup)
-            # Далі призначення викладача, аудиторії та часового слоту
-Пояснення:
+   **Пояснення:**
 
-Рівномірний розподіл занять: Загальну кількість практичних занять ділю на кількість підгруп, щоб кожна підгрупа отримала рівну кількість занять.
-Створення занять для кожної підгрупи: Для кожної підгрупи створюються відповідні заняття, які потім призначаються викладачам, аудиторіям і часовим слотам.
-Результат: Це забезпечує, що під час ініціалізації розкладу кожна підгрупа має належну кількість занять.
+   - **Облік підгруп:** Для кожного предмета і групи я отримую список підгруп. Якщо підгруп немає, використовую `[None]`, щоб обробити групи без підгруп.
+   - **Розрахунок запланованих занять:** Для кожної підгрупи окремо обчислюю кількість запланованих лекцій та практичних занять, перебираючи всі уроки в розкладі.
+   - **Розрахунок необхідних занять:** Обчислюю необхідну кількість занять для кожної підгрупи, ділячи загальну кількість занять на кількість підгруп (для предметів, які вимагають підгруп).
+   - **Обчислення штрафів:** Розраховую різницю між запланованими та необхідними заняттями для кожної підгрупи. Штраф додається пропорційно до абсолютного значення цієї різниці.
+   - **Результат:** Таким чином, фітнес-функція враховує дисбаланс у кількості занять між підгрупами, і ідеальний скор можливий лише тоді, коли всі підгрупи мають необхідну кількість занять.
+
+2. **Перевірка під час створення розкладу:**
+
+   У функції `create_initial_population` під час створення початкового розкладу я переконався, що заняття призначаються для кожної підгрупи окремо.
+
+   ```python
+   # Практичні
+   pract_total = subject.num_practicals
+   if subject.requires_subgroups and group.subgroups:
+       num_practicals_per_subgroup = pract_total // len(group.subgroups)
+       for subgroup in group.subgroups:
+           for _ in range(num_practicals_per_subgroup):
+               lesson = Lesson(subject, 'Практика', group, subgroup)
+               # Далі призначення викладача, аудиторії та часового слоту
+   ```
+
+   **Пояснення:**
+
+   - **Рівномірний розподіл занять:** Загальну кількість практичних занять ділю на кількість підгруп, щоб кожна підгрупа отримала рівну кількість занять.
+   - **Створення занять для кожної підгрупи:** Для кожної підгрупи створюються відповідні заняття, які потім призначаються викладачам, аудиторіям і часовим слотам.
+   - **Результат:** Це забезпечує, що під час ініціалізації розкладу кожна підгрупа має належну кількість занять.
+
+---
+
+### **Вимога 2**
 
 
+1. **Розширення функції мутації:**
 
+   У функції `mutate` я додав можливість випадкового додавання та видалення занять з розкладу.
 
+   ```python
+   def mutate(schedule):
+       mutation_rate = 0.1  # Ймовірність мутації 10%
+       for timetable in [schedule.even_timetable, schedule.odd_timetable]:
+           # Шанс додати нове заняття
+           if random.random() < mutation_rate:
+               add_random_lesson(timetable)
+           # Шанс видалити існуюче заняття
+           if random.random() < mutation_rate:
+               remove_random_lesson(timetable)
+           # Подальша мутація шляхом зміни часового слоту занять
+   ```
 
+   **Пояснення:**
 
-Рішення 2222:
+   - **Додавання та видалення занять:** Додаються функції `add_random_lesson` та `remove_random_lesson`, які відповідають за додавання та видалення занять.
+   - **Ймовірність мутації:** Використовується параметр `mutation_rate`, який визначає ймовірність додавання або видалення заняття.
+   - **Результат:** Це допомагає компенсувати втрату занять під час кросоверу, оскільки мутація може додати втрачені заняття назад у розклад.
 
-Розширення функції мутації:
+2. **Додавання заняття з урахуванням підгруп:**
 
-У функції mutate я додав можливість випадкового додавання та видалення занять з розкладу.
+   Функція `add_random_lesson` додає заняття для всіх підгруп одночасно, якщо предмет вимагає підгруп.
 
-python
-Копировать код
-def mutate(schedule):
-    mutation_rate = 0.1  # Ймовірність мутації 10%
-    for timetable in [schedule.even_timetable, schedule.odd_timetable]:
-        # Шанс додати нове заняття
-        if random.random() < mutation_rate:
-            add_random_lesson(timetable)
-        # Шанс видалити існуюче заняття
-        if random.random() < mutation_rate:
-            remove_random_lesson(timetable)
-        # Подальша мутація шляхом зміни часового слоту занять
-Пояснення:
+   ```python
+   def add_random_lesson(timetable):
+       # Випадковий предмет та тип заняття
+       # ...
+       lessons_to_add = []
+       if lesson_type == 'Практика' and subject.requires_subgroups and group.subgroups:
+           for subgroup in group.subgroups:
+               lesson = Lesson(subject, lesson_type, group, subgroup)
+               lessons_to_add.append(lesson)
+       else:
+           lesson = Lesson(subject, lesson_type, group)
+           lessons_to_add.append(lesson)
+       # Призначаємо викладача та аудиторію для кожного заняття
+       # ...
+       # Призначаємо часовий слот без конфліктів
+       # ...
+   ```
 
-Додавання та видалення занять: Додаються функції add_random_lesson та remove_random_lesson, які відповідають за додавання та видалення занять.
-Ймовірність мутації: Використовується параметр mutation_rate, який визначає ймовірність додавання або видалення заняття.
-Результат: Це допомагає компенсувати втрату занять під час кросоверу, оскільки мутація може додати втрачені заняття назад у розклад.
-Додавання заняття з урахуванням підгруп:
+   **Пояснення:**
 
-Функція add_random_lesson додає заняття для всіх підгруп одночасно, якщо предмет вимагає підгруп.
+   - **Створення списку занять:** Якщо предмет вимагає підгруп, створюємо заняття для кожної підгрупи та додаємо їх до списку `lessons_to_add`.
+   - **Призначення викладача та аудиторії:** Для кожного заняття з цього списку призначаємо викладача та аудиторію, перевіряючи жорсткі обмеження.
+   - **Призначення часового слоту:** Перебираємо часові слоти та перевіряємо, чи можна призначити всі заняття з `lessons_to_add` без конфліктів. Якщо так, додаємо їх до розкладу.
+   - **Результат:** Це гарантує, що при додаванні заняття для предмета з підгрупами, заняття додаються для всіх підгруп одночасно, зберігаючи баланс.
 
-python
-Копировать код
-def add_random_lesson(timetable):
-    # Випадковий предмет та тип заняття
-    # ...
-    lessons_to_add = []
-    if lesson_type == 'Практика' and subject.requires_subgroups and group.subgroups:
-        for subgroup in group.subgroups:
-            lesson = Lesson(subject, lesson_type, group, subgroup)
-            lessons_to_add.append(lesson)
-    else:
-        lesson = Lesson(subject, lesson_type, group)
-        lessons_to_add.append(lesson)
-    # Призначаємо викладача та аудиторію для кожного заняття
-    # ...
-    # Призначаємо часовий слот без конфліктів
-    # ...
-Пояснення:
+3. **Видалення заняття з урахуванням підгруп:**
 
-Створення списку занять: Якщо предмет вимагає підгруп, створюємо заняття для кожної підгрупи та додаємо їх до списку lessons_to_add.
-Призначення викладача та аудиторії: Для кожного заняття з цього списку призначаємо викладача та аудиторію, перевіряючи жорсткі обмеження.
-Призначення часового слоту: Перебираємо часові слоти та перевіряємо, чи можна призначити всі заняття з lessons_to_add без конфліктів. Якщо так, додаємо їх до розкладу.
-Результат: Це гарантує, що при додаванні заняття для предмета з підгрупами, заняття додаються для всіх підгруп одночасно, зберігаючи баланс.
-Видалення заняття з урахуванням підгруп:
+   Функція `remove_random_lesson` видаляє всі пов'язані заняття для підгруп одночасно.
 
-Функція remove_random_lesson видаляє всі пов'язані заняття для підгруп одночасно.
+   ```python
+   def remove_random_lesson(timetable):
+       # Випадкове заняття для видалення
+       # ...
+       lessons_to_remove = []
+       if lesson_to_remove.subgroup:
+           for lessons in timetable.values():
+               for lesson in lessons:
+                   if (lesson.subject.id == lesson_to_remove.subject.id and
+                       lesson.group.number == lesson_to_remove.group.number and
+                       lesson.type == lesson_to_remove.type):
+                       lessons_to_remove.append(lesson)
+       else:
+           lessons_to_remove.append(lesson_to_remove)
+       for lesson in lessons_to_remove:
+           timetable[lesson.time_slot].remove(lesson)
+   ```
 
-python
-Копировать код
-def remove_random_lesson(timetable):
-    # Випадкове заняття для видалення
-    # ...
-    lessons_to_remove = []
-    if lesson_to_remove.subgroup:
-        for lessons in timetable.values():
-            for lesson in lessons:
-                if (lesson.subject.id == lesson_to_remove.subject.id and
-                    lesson.group.number == lesson_to_remove.group.number and
-                    lesson.type == lesson_to_remove.type):
-                    lessons_to_remove.append(lesson)
-    else:
-        lessons_to_remove.append(lesson_to_remove)
-    for lesson in lessons_to_remove:
-        timetable[lesson.time_slot].remove(lesson)
-Пояснення:
+   **Пояснення:**
 
-Визначення занять для видалення: Якщо заняття належить до підгрупи, шукаємо всі заняття з тим самим предметом, групою та типом, незалежно від підгрупи.
-Видалення занять: Видаляємо всі знайдені заняття з розкладу.
-Результат: Це забезпечує, що заняття видаляються одночасно для всіх підгруп, зберігаючи баланс і коректність розкладу.
-Перевірка конфліктів з урахуванням підгруп:
+   - **Визначення занять для видалення:** Якщо заняття належить до підгрупи, шукаємо всі заняття з тим самим предметом, групою та типом, незалежно від підгрупи.
+   - **Видалення занять:** Видаляємо всі знайдені заняття з розкладу.
+   - **Результат:** Це забезпечує, що заняття видаляються одночасно для всіх підгруп, зберігаючи баланс і коректність розкладу.
 
-Функція is_conflict перевіряє конфлікти між заняттями з урахуванням підгруп.
+4. **Перевірка конфліктів з урахуванням підгруп:**
 
-python
-Копировать код
-def is_conflict(lesson, time_slot, timetable):
-    for existing_lesson in timetable[time_slot]:
-        # Перевірка викладача
-        # ...
-        # Перевірка аудиторії
-        # ...
-        # Перевірка групи та підгрупи
-        if lesson.group.number == existing_lesson.group.number:
-            if lesson.subgroup == existing_lesson.subgroup:
-                return True
-            # Якщо одне з занять без підгрупи
-            if not lesson.subgroup or not existing_lesson.subgroup:
-                return True
-    return False
-Пояснення:
+   Функція `is_conflict` перевіряє конфлікти між заняттями з урахуванням підгруп.
 
-Конфлікт по підгрупах: Якщо заняття належать до однієї групи та тієї ж підгрупи, це конфлікт.
-Конфлікт з заняттям без підгрупи: Якщо одне з занять не має підгрупи (наприклад, лекція), воно конфліктує з будь-яким заняттям підгрупи тієї ж групи.
-Результат: Ця перевірка гарантує, що заняття не накладаються одне на одне, враховуючи підгрупи.
+   ```python
+   def is_conflict(lesson, time_slot, timetable):
+       for existing_lesson in timetable[time_slot]:
+           # Перевірка викладача
+           # ...
+           # Перевірка аудиторії
+           # ...
+           # Перевірка групи та підгрупи
+           if lesson.group.number == existing_lesson.group.number:
+               if lesson.subgroup == existing_lesson.subgroup:
+                   return True
+               # Якщо одне з занять без підгрупи
+               if not lesson.subgroup or not existing_lesson.subgroup:
+                   return True
+       return False
+   ```
+
+   **Пояснення:**
+
+   - **Конфлікт по підгрупах:** Якщо заняття належать до однієї групи та тієї ж підгрупи, це конфлікт.
+   - **Конфлікт з заняттям без підгрупи:** Якщо одне з занять не має підгрупи (наприклад, лекція), воно конфліктує з будь-яким заняттям підгрупи тієї ж групи.
+   - **Результат:** Ця перевірка гарантує, що заняття не накладаються одне на одне, враховуючи підгрупи.
+
+---
+
+.
+
 
 
 
