@@ -181,30 +181,29 @@ class Schedule:
             group = next((g for g in groups if g.number == subject.group_id), None)
             if not group:
                 continue
-            subgroups = group.subgroups if group.subgroups else [None]
+            subgroups = group.subgroups if subject.requires_subgroups else [None]
+            scheduled_lectures = 0
+            scheduled_practicals = {s: 0 for s in subgroups}
+            required_lectures = subject.num_lectures
+            required_practicals = subject.num_practicals
             for subgroup in subgroups:
-                scheduled_lectures = 0
-                scheduled_practicals = 0
-                required_lectures = subject.num_lectures
-                required_practicals = subject.num_practicals
-                if subject.requires_subgroups and subgroup:
-                    required_practicals = math.ceil(subject.num_practicals / len(subgroups))
                 for timetable in [self.even_timetable, self.odd_timetable]:
                     for time_slot, lessons in timetable.items():
                         for lesson in lessons:
-                            if (lesson.subject.id == subject.id and
-                                lesson.group.number == group.number and
-                                lesson.subgroup == subgroup):
-                                if lesson.type == 'Лекція':
-                                    scheduled_lectures += 1
-                                elif lesson.type == 'Практика':
-                                    scheduled_practicals += 1
-                # Calculating the difference between scheduled and required hours
-                diff_lectures = scheduled_lectures - required_lectures
-                diff_practicals = scheduled_practicals - required_practicals
-                penalty += abs(diff_lectures) * 2
-                penalty += abs(diff_practicals) * 2
+                            if lesson.type == 'Лекція' and lesson.subject.id == subject.id \
+                                    and lesson.group.number == group.number:
+                                scheduled_lectures += 1
+                            elif lesson.type == 'Практика' and lesson.subject.id == subject.id \
+                                    and lesson.group.number == group.number and lesson.subgroup == subgroup:
+                                scheduled_practicals[subgroup] += 1
+
+            # Calculating the difference between scheduled and required hours
+            diff_lectures = scheduled_lectures - required_lectures
+            diff_practicals = [abs(practical - required_practicals) for _, practical in scheduled_practicals.items()]
+            penalty += abs(diff_lectures) * 2
+            penalty += sum(diff_practicals) * 2
         return penalty
+
 
 def get_possible_lecturers(lesson):
     # Matching lecturers by subject.id and lesson type (hard constraint)
